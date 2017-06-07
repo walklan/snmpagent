@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-var once sync.Once
-
 var testoid = wsnmp.MustParseOid(".1.3.6.1.2.1.1.2.0")
 
 var errReachMaxconn = errors.New("snmpagent: reach max snmp connections")
@@ -28,6 +26,7 @@ type Session struct {
 var SnmpSession = &SessionPool{Sessions: make(map[string]*Session)}
 
 func init() {
+	var once sync.Once
 	// 启动定时器清理session池
 	once.Do(func() { go SnmpSession.sessCleaner(config.Maxlifetime) })
 }
@@ -71,7 +70,9 @@ func (sesspool *SessionPool) putSess(ip string, s *Session) {
 
 func snmptest(s *wsnmp.WapSNMP) bool {
 	r, err := s.Get(testoid)
-	Debug("snmptest", r)
+	if config.Debug {
+		Debug("snmptest", r)
+	}
 	if err != nil {
 		return false
 	}

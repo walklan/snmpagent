@@ -10,3 +10,4 @@ http:
 log:
     - logdir: "F:\\"
     - debug: true
+    - logarchsize: 1048576

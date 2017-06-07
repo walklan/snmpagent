@@ -22,6 +22,9 @@ var Port string = "1216"
 var Logdir string = "./"
 var Asyncnum int = 100
 
+// default 100M
+var Logarchsize int64 = 104857600
+
 func init() {
 	configmap, err := GetConfig()
 	if err != nil {
@@ -83,6 +86,15 @@ func init() {
 	logdir := GetKey("log.logdir", configmap)
 	if logdir != "" {
 		Logdir = logdir
+	}
+
+	// logdir
+	logarchsize := GetKey("log.logarchsize", configmap)
+	if logarchsize != "" {
+		las, err := strconv.ParseInt(logarchsize, 10, 64)
+		if err == nil {
+			Logarchsize = las
+		}
 	}
 }
 

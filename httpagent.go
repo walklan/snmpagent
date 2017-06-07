@@ -8,10 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
-	"path/filepath"
 	"runtime"
-	"strings"
 )
 
 var logger *log.Logger
@@ -22,13 +19,8 @@ func main() {
 	os.Setenv("PORT", port)
 	os.Setenv("MARTINI_ENV", martini.Prod)
 	mux := martini.Classic()
-	filename := strings.TrimSuffix(filepath.Base(os.Args[0]), path.Ext(os.Args[0]))
-	logger = util.GetLogger(filename + ".log")
+	logger = util.Applog.GetLogger()
 	mux.Map(logger)
-
-	//global inject
-	// sysvar := &route.Syslvlvar{timeout, retry, Debug}
-	// mux.Map(sysvar)
 
 	// support get and post method
 	mux.Get("/snmpagent", route.SnmpAgent)

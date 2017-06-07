@@ -7,9 +7,26 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"time"
 )
+
+type Logger struct {
+	Logfile   string
+	Loghandle *os.File
+	mu        sync.Mutex
+}
+
+var Applog = &Logger{Logfile: config.Logdir + "/" + strings.TrimSuffix(filepath.Base(os.Args[0]), path.Ext(os.Args[0])) + ".log"}
+
+func init() {
+	Applog.SetLogfile()
+	var once sync.Once
+	once.Do(func() { go Applog.logmonitor() })
+}
 
 func CheckFileIsExist(filename string) bool {
 	var exist = true
@@ -70,20 +87,62 @@ func OpenFile(filename string, flag string) (*os.File, error) {
 	}
 }
 
-func GetLogger(logname string) *log.Logger {
+func (a *Logger) GetLogger() *log.Logger {
+	return log.New(a.Loghandle, "", log.Ldate|log.Ltime|log.Lshortfile)
+}
 
-	log_file := config.Logdir + "/" + logname
-
-	//logger
-	file, err := OpenFile(log_file, ">>")
+func (a *Logger) SetLogfile() error {
+	file, err := OpenFile(a.Logfile, ">>")
 	if err != nil {
-		log.Panicf("%s\n", err.Error())
+		Error(err)
+	}
+	a.Loghandle = file
+	a.logformat()
+	return err
+}
+
+func (a *Logger) logformat() {
+	log.SetOutput(a.Loghandle)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+}
+
+func (a *Logger) logmonitor() {
+	const d = 10 * time.Second
+
+	t := time.NewTimer(d)
+	for {
+		select {
+		case <-t.C:
+		}
+		if a.fileswitch() {
+			a.mu.Lock()
+			err := a.Loghandle.Close()
+			if err == nil {
+				e := os.Rename(a.Logfile, a.Logfile+"."+time.Now().Format("20060102150405"))
+				if e == nil {
+					a.SetLogfile()
+				}
+			}
+			a.mu.Unlock()
+		}
+		t.Reset(d)
+	}
+}
+
+func (a *Logger) fileswitch() bool {
+	if filesize(a.Logfile) >= config.Logarchsize {
+		return true
+	}
+	return false
+}
+
+func filesize(file string) int64 {
+	f, e := os.Stat(file)
+	if e != nil {
+		return 0
 	}
 
-	// log.Println("log:" + log_file)
-	log.SetOutput(file)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	return log.New(file, "", log.Ldate|log.Ltime|log.Lshortfile)
+	return f.Size()
 }
 
 func Debug(v ...interface{}) {
