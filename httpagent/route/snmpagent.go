@@ -28,6 +28,17 @@ type UnitResult struct {
 	Error string
 }
 
+type SnmpResultMulti struct {
+	Data  []UnitResultMulti
+	Error string
+}
+
+type UnitResultMulti struct {
+	Index string
+	Value []string
+	Error string
+}
+
 func ParameterCheck(m map[string]string) string {
 	err := ""
 	for k, v := range m {
@@ -67,6 +78,8 @@ func SnmpAgent(w http.ResponseWriter, r *http.Request) {
 	version := r.Form.Get("version")
 	timeoutu := r.Form.Get("timeout")
 	retryu := r.Form.Get("retry")
+	intervalu := r.Form.Get("interval")
+	countu := r.Form.Get("count")
 
 	// paramter check
 	paramap := map[string]string{"seq": seq, "ip": ip, "community": community, "oids": oids, "version": version}
@@ -77,14 +90,48 @@ func SnmpAgent(w http.ResponseWriter, r *http.Request) {
 	if err == "" {
 		timeout := Gettimeout(timeoutu, config.Timeout)
 		retry := Getretry(retryu, config.Retry)
+		interval := GetparaStrtoInt(intervalu, 1)
+		count := GetparaStrtoInt(countu, 1)
+		if count <= 1 {
+			interval = 0
+		}
 		// log.Println(timeoutu, config.Timeout, retryu, config.Retry, timeout, retry)
-		result = Snmp(ip, community, oids, version, timeout, retry)
+		result = Snmp(ip, community, oids, version, timeout, retry, interval, count)
+
+		if count > 1 {
+			var retmap = make(map[string]int)
+			var resultmulti SnmpResultMulti
+			pos := 0
+			resultmulti.Error = result.Error
+			for _, v := range result.Data {
+				if valuepos, ok := retmap[v.Index]; ok {
+					resultmulti.Data[valuepos].Value = append(resultmulti.Data[valuepos].Value, v.Value)
+				} else {
+					resultmulti.Data = append(resultmulti.Data, UnitResultMulti{v.Index, []string{v.Value}, v.Error})
+					retmap[v.Index] = pos
+					pos++
+				}
+			}
+			RouteJson(w, &resultmulti)
+			return
+		}
 	} else {
 		result = ParameterError(err)
 	}
 
 	//return
 	RouteJson(w, &result)
+}
+
+func GetparaStrtoInt(s string, t int) int {
+	if s == "" {
+		return t
+	}
+	m, errs := strconv.Atoi(s)
+	if errs != nil {
+		return t
+	}
+	return m
 }
 
 func Gettimeout(tu string, ts time.Duration) time.Duration {
@@ -111,7 +158,7 @@ func Getretry(ru string, rs int) int {
 	return r
 }
 
-func Snmp(ip, community, oids, snmpversion string, timeout time.Duration, retry int) SnmpResult {
+func Snmp(ip, community, oids, snmpversion string, timeout time.Duration, retry, interval, count int) SnmpResult {
 	snmpresult := SnmpResult{Error: ""}
 	version := wsnmp.SNMPv2c
 	if snmpversion == "v1" {
@@ -136,35 +183,38 @@ func Snmp(ip, community, oids, snmpversion string, timeout time.Duration, retry 
 		return snmpresult
 	}
 
-	// snmp goroutine
-	data_c := make(chan SnmpResult)
-	tasks := 0
-	for _, mib := range strings.Split(oids, "!") {
-		mo := strings.Split(mib, ":")
-		switch mo[0] {
-		case "table":
-			for _, m := range strings.Split(mo[1], ",") {
-				tasks++
-				go Snmpgettable(data_c, m, snmpsess)
+	// col more times
+	for i := 0; i < count; i++ {
+		// snmp goroutine
+		data_c := make(chan SnmpResult)
+		tasks := 0
+		for _, mib := range strings.Split(oids, "!") {
+			mo := strings.Split(mib, ":")
+			switch mo[0] {
+			case "table":
+				for _, m := range strings.Split(mo[1], ",") {
+					tasks++
+					go Snmpgettable(data_c, m, snmpsess)
+				}
+			case "get":
+				for _, m := range strings.Split(mo[1], ",") {
+					tasks++
+					go Snmpget(data_c, m, snmpsess)
+				}
+			default:
+				// do nothing, because parameter check have been checked before
 			}
-		case "get":
-			for _, m := range strings.Split(mo[1], ",") {
-				tasks++
-				go Snmpget(data_c, m, snmpsess)
+		}
+		for task_i := 0; task_i < tasks; task_i++ {
+			snmprtmp := <-data_c
+			snmpresult.Data = append(snmpresult.Data, snmprtmp.Data...)
+			if snmpresult.Error == "" {
+				snmpresult.Error = snmprtmp.Error
 			}
-		default:
-			// do nothing, beause parameter check have been checked before
 		}
+		time.Sleep(time.Duration(interval) * time.Second)
 	}
-	for task_i := 0; task_i < tasks; task_i++ {
-		snmprtmp := <-data_c
-		for _, v := range snmprtmp.Data {
-			snmpresult.Data = append(snmpresult.Data, v)
-		}
-		if snmpresult.Error == "" {
-			snmpresult.Error = snmprtmp.Error
-		}
-	}
+
 	return snmpresult
 }
 
