@@ -18,8 +18,10 @@ var async_c = make(chan int, config.Asyncnum)
 const snmpgetfail = "snmp get failed"
 
 type SnmpResult struct {
-	Data  []UnitResult
-	Error string
+	Data      []UnitResult
+	Starttime string
+	Endtime   string
+	Error     string
 }
 
 type UnitResult struct {
@@ -29,8 +31,10 @@ type UnitResult struct {
 }
 
 type SnmpResultMulti struct {
-	Data  []UnitResultMulti
-	Error string
+	Data      []UnitResultMulti
+	Starttime string
+	Endtime   string
+	Error     string
 }
 
 type UnitResultMulti struct {
@@ -99,10 +103,12 @@ func SnmpAgent(w http.ResponseWriter, r *http.Request) {
 		result = Snmp(ip, community, oids, version, timeout, retry, interval, count)
 
 		if count > 1 {
+			pos := 0
 			var retmap = make(map[string]int)
 			var resultmulti SnmpResultMulti
-			pos := 0
 			resultmulti.Error = result.Error
+			resultmulti.Starttime = result.Starttime
+			resultmulti.Endtime = result.Endtime
 			for _, v := range result.Data {
 				if valuepos, ok := retmap[v.Index]; ok {
 					resultmulti.Data[valuepos].Value = append(resultmulti.Data[valuepos].Value, v.Value)
@@ -159,7 +165,7 @@ func Getretry(ru string, rs int) int {
 }
 
 func Snmp(ip, community, oids, snmpversion string, timeout time.Duration, retry, interval, count int) SnmpResult {
-	snmpresult := SnmpResult{Error: ""}
+	snmpresult := SnmpResult{Error: "", Starttime: time.Now().Format("20060102150405.000")}
 	version := wsnmp.SNMPv2c
 	if snmpversion == "v1" {
 		version = wsnmp.SNMPv1
@@ -215,6 +221,7 @@ func Snmp(ip, community, oids, snmpversion string, timeout time.Duration, retry,
 		time.Sleep(time.Duration(interval) * time.Second)
 	}
 
+	snmpresult.Endtime = time.Now().Format("20060102150405.000")
 	return snmpresult
 }
 

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"flag"
 	"fmt"
 	"github.com/go-yaml/yaml"
 	"io/ioutil"
@@ -13,7 +14,7 @@ import (
 const cfgfile string = "config/snmpagent.yml"
 
 // system level config interface
-var Maxsesspool = 1000
+var Maxsesspool int = 1000
 var Maxlifetime time.Duration = 30 * time.Second
 var Timeout time.Duration = 2 * time.Second
 var Retry int = 1
@@ -96,6 +97,27 @@ func init() {
 			Logarchsize = las
 		}
 	}
+
+	// 命令行参数
+	Porttmp := flag.String("port", Port, "http listen port")
+	Retrytmp := flag.Int("retry", Retry, "snmp retry times")
+	Asyncnumtmp := flag.Int("asyncnum", Asyncnum, "snmp asyncnum")
+	Debugtmp := flag.Bool("debug", Debug, "debug")
+	Logdirtmp := flag.String("logdir", Logdir, "log directory")
+	Maxsesspooltmp := flag.Int("maxsesspool", Maxsesspool, "snmp maxsesspool")
+	Logarchsizetmp := flag.Int64("logarchsize", Logarchsize, "logarchsize")
+	Maxlifetimetmp := flag.Duration("maxlifetime", Maxlifetime, "snmp maxlifetime")
+	Timeouttmp := flag.Duration("timeout", Timeout, "snmp timeout")
+	flag.Parse()
+	Port = *Porttmp
+	Retry = *Retrytmp
+	Asyncnum = *Asyncnumtmp
+	Debug = *Debugtmp
+	Logdir = *Logdirtmp
+	Maxsesspool = *Maxsesspooltmp
+	Logarchsize = *Logarchsizetmp
+	Maxlifetime = *Maxlifetimetmp
+	Timeout = *Timeouttmp
 }
 
 // 需要做动态加载配置文件，放在主调程序做
