@@ -1,6 +1,6 @@
 # snmpagent config
 snmp:
-    - asyncnum: 100
+    - asyncnum: 10
     - timeout: 2
     - retry: 1
     - maxsesspool: 1000
@@ -8,6 +8,5 @@ snmp:
 http:
     - port: 1216
 log:
-    - logdir: "F:\\"
-    - debug: true
-    - logarchsize: 1048576
+    - debug: false
+    - logarchsize: 10485760
