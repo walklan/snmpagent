@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-var cfgfile string = filepath.Dir(os.Args[0]) + "/../config/snmpagent.yml"
+var cfgfile string = filepath.Dir(os.Args[0]) + "/../config/httpagent.yml"
 
 // system level config interface
 var Maxsesspool int = 1000
